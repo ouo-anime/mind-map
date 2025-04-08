@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mind Map</title>
+<style>
+:root {
+    --background-dark: #1a1a1a;
+    --text-dark: #ffffff;
+    --glass-dark: rgba(40, 40, 40, 0.9);
+    --border-dark: #ffffff;
+    --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    --dock-bg-dark: rgba(40, 40, 40, 0.95);
+    --background-light: #ffffff;
+    --text-light: #333333;
+    --glass-light: rgba(255, 255, 255, 0.9);
+    --border-light: #aaaaaa;
+    --dock-bg-light: rgba(255, 255, 255, 0.95);
+}
+* {
+    box-sizing: border-box;
+}
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Poppins', sans-serif;
+    background: var(--background-dark);
+    color: var(--text-dark);
+    overflow-x: hidden;
+    transition: background 0.5s ease, color 0.5s ease;
+}
+#map-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    margin: 0 auto;
+}
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    transition: opacity 0.3s ease;
+}
+.node {
+    position: absolute;
+    padding: 12px 24px;
+    border-radius: 12px;
+    background: var(--glass-dark);
+    backdrop-filter: blur(10px);
+    border: 2px solid var(--border-dark);
+    z-index: 1;
+    text-align: center;
+    white-space: nowrap;
+    cursor: move;
+    font-size: 16px;
+    box-shadow: var(--shadow);
+    transition: transform 0.2s ease, border-color 0.3s ease, background 0.5s ease, color 0.5s ease, opacity 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    opacity: 0;
+    user-select: none;
+}
+.node.appear {
+    opacity: 1;
+}
+.node:hover {
+    transform: scale(1.05);
+}
+.node-text {
+    display: inline-block;
+}
+.plus-button, .delete-button, .edit-button {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    display: none;
+    transition: opacity 0.3s ease;
+}
+.plus-button {
+    bottom: -10px;
+    right: -10px;
+}
+.delete-button {
+    top: -10px;
+    left: -10px;
+}
+.edit-button {
+    bottom: -10px;
+    left: -10px;
+}
+.plus-button:hover, .delete-button:hover, .edit-button:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+#dock {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    background: var(--dock-bg-dark);
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+    box-shadow: var(--shadow);
+    z-index: 100;
+    transition: background 0.5s ease;
+}
+.dock-button {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: var(--text-dark);
+    font-size: 20px;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.3s ease, color 0.5s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.dock-button:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+.dock-button:active {
+    transform: scale(1.1);
+}
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+.modal.show {
+    opacity: 1;
+}
+.modal-content {
+    padding: 20px;
+    border-radius: 12px;
+    width: 400px;
+    max-width: 90%;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px);
+    transition: background 0.5s ease, color 0.5s ease, border 0.5s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.modal-dark {
+    background: var(--glass-dark);
+    color: var(--text-dark);
+    border: 2px solid var(--border-dark);
+}
+.modal-light {
+    background: var(--glass-light);
+    color: var(--text-light);
+    border: 2px solid var(--border-light);
+}
+.modal-content h3 {
+    margin: 0 0 20px;
+    font-size: 20px;
+    text-align: center;
+    width: 100%;
+}
+.modal-content input, .modal-content select {
+    width: 100%;
+    max-width: 360px;
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+    color: inherit;
+    font-size: 14px;
+    transition: border 0.3s ease;
+}
+.modal-content button {
+    width: 100%;
+    max-width: 360px;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: inherit;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    margin-top: 10px;
+}
+.modal-content button:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+.line-hover {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    display: none;
+    z-index: 10;
+    cursor: pointer;
+    transition: opacity 0.3s ease;
+}
+#selection-box {
+    position: absolute;
+    border: 2px dashed #00ff00;
+    background: rgba(0, 255, 0, 0.1);
+    z-index: 5;
+    display: none;
+    transition: opacity 0.3s ease;
+}
+.toggle-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 360px;
+    margin-bottom: 15px;
+}
+.toggle-label {
+    font-size: 14px;
+}
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+}
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.slider {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    top: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+}
+input:checked + .slider {
+    background: #4caf50;
+}
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+</style>
+</head>
+<body>
+  <div id="dock">
+    <button type="button" class="dock-button" id="add-node" title="Add Node">➕</button>
+    <button type="button" class="dock-button" id="save-map" title="Save Map">💾</button>
+    <button type="button" class="dock-button" id="load-map" title="Load Map">📂</button>
+    <button type="button" class="dock-button" id="screenshot" title="Screenshot">📷</button>
+    <button type="button" class="dock-button" id="settings" title="Settings">⚙️</button>
+</div>
+<input type="file" id="load-file" accept=".json" style="display:none;">
+<div id="map-container">
+    <canvas id="lines"></canvas>
+    <div id="line-hover" class="line-hover"></div>
+    <div id="selection-box"></div>
+</div>
+<div id="node-modal" class="modal">
+    <div class="modal-content modal-dark">
+        <h3>Add New Node</h3>
+        <input type="text" id="node-text" placeholder="Node text">
+        <select id="node-level">
+            <option value="main">Main Node</option>
+            <option value="sub">Sub Node</option>
+        </select>
+        <input type="color" id="node-color" value="#ffffff">
+        <button type="button" id="submit-node">Add</button>
+        <button type="button" id="close-node">Cancel</button>
+    </div>
+</div>
+<div id="edit-node-modal" class="modal">
+    <div class="modal-content modal-dark">
+        <h3>Edit Node</h3>
+        <input type="text" id="edit-node-text" placeholder="New node text">
+        <input type="color" id="edit-node-color" value="#ffffff">
+        <button type="button" id="submit-edit-node">Apply</button>
+        <button type="button" id="close-edit-node">Cancel</button>
+    </div>
+</div>
+<div id="connect-modal" class="modal">
+    <div class="modal-content modal-dark">
+        <h3>Edit Line Style</h3>
+        <select id="line-style">
+            <option value="solid">Solid</option>
+            <option value="dashed">Dashed</option>
+            <option value="dotted">Dotted</option>
+        </select>
+        <select id="fill-style">
+            <option value="solid-color">Solid Color</option>
+            <option value="gradient">Gradient</option>
+            <option value="pattern-dots">Dots Pattern</option>
+            <option value="pattern-stripes">Stripes Pattern</option>
+        </select>
+        <input type="color" id="line-color1" value="#aaaaaa">
+        <input type="color" id="line-color2" value="#ffffff">
+        <button type="button" id="submit-connect">Apply</button>
+        <button type="button" id="close-connect">Cancel</button>
+    </div>
+</div>
+<div id="screenshot-modal" class="modal">
+    <div class="modal-content modal-dark">
+        <h3>Choose Screenshot Theme</h3>
+        <select id="screenshot-theme">
+            <option value="dark">Dark Theme</option>
+            <option value="light">Light Theme</option>
+            <option value="both">Both Themes</option>
+        </select>
+        <div id="both-options" style="display:none;">
+            <select id="screenshot-format">
+                <option value="vertical">Vertical (Dark over Light)</option>
+                <option value="horizontal">Horizontal (Light then Dark)</option>
+                <option value="separate">Two Separate Files</option>
+            </select>
+        </div>
+        <button type="button" id="submit-screenshot">Take Screenshot</button>
+        <button type="button" id="close-screenshot">Cancel</button>
+    </div>
+</div>
+<div id="settings-modal" class="modal">
+    <div class="modal-content modal-dark">
+        <h3>Settings</h3>
+        <div class="toggle-container">
+            <span class="toggle-label">Enable Light Theme (Beta)</span>
+            <label class="switch">
+                <input type="checkbox" id="beta-theme-toggle">
+                <span class="slider"></span>
+            </label>
+        </div>
+        <button type="button" id="apply-settings">Apply</button>
+        <button type="button" id="close-settings">Cancel</button>
+    </div>
+</div>
+<script>
+const canvas = document.getElementById('lines');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+let nodes = [];
+let connections = [];
+let isDrawing = false;
+let startNode = null;
+let tempLine = null;
+let selectedNodeId = null;
+let currentTheme = 'dark';
+let betaThemeEnabled = false;
+const lineHover = document.getElementById('line-hover');
+const selectionBox = document.getElementById('selection-box');
+let isSelecting = false;
+let selectionStart = null;
+
+function getCenter(el) {
+    const rect = el.getBoundingClientRect();
+    const parentRect = canvas.getBoundingClientRect();
+    return {
+        x: rect.left + rect.width / 2 - parentRect.left,
+        y: rect.top + rect.height / 2 - parentRect.top
+    };
+}
+
+function drawLine(fromX, fromY, toX, toY, style, fillStyle, color1, color2) {
+    ctx.lineWidth = 3;
+    const controlX = (fromX + toX) / 2;
+    const controlY = fromY - 50;
+    ctx.beginPath();
+    ctx.moveTo(fromX, fromY);
+    if (fillStyle === 'solid-color') {
+        ctx.strokeStyle = color1;
+    } else if (fillStyle === 'gradient') {
+        const gradient = ctx.createLinearGradient(fromX, fromY, toX, toY);
+        gradient.addColorStop(0, color1);
+        gradient.addColorStop(1, color2);
+        ctx.strokeStyle = gradient;
+    } else if (fillStyle === 'pattern-dots') {
+        const patternCanvas = document.createElement('canvas');
+        patternCanvas.width = 10;
+        patternCanvas.height = 10;
+        const pCtx = patternCanvas.getContext('2d');
+        pCtx.fillStyle = color1;
+        pCtx.fillRect(0, 0, 10, 10);
+        pCtx.fillStyle = color2;
+        pCtx.fillRect(2, 2, 2, 2);
+        ctx.strokeStyle = ctx.createPattern(patternCanvas, 'repeat');
+    } else if (fillStyle === 'pattern-stripes') {
+        const patternCanvas = document.createElement('canvas');
+        patternCanvas.width = 10;
+        patternCanvas.height = 10;
+        const pCtx = patternCanvas.getContext('2d');
+        pCtx.fillStyle = color1;
+        pCtx.fillRect(0, 0, 10, 10);
+        pCtx.fillStyle = color2;
+        pCtx.fillRect(0, 0, 2, 10);
+        ctx.strokeStyle = ctx.createPattern(patternCanvas, 'repeat');
+    }
+    if (style === 'solid') {
+        ctx.setLineDash([]);
+        ctx.quadraticCurveTo(controlX, controlY, toX, toY);
+    } else if (style === 'dashed') {
+        ctx.setLineDash([10, 10]);
+        ctx.quadraticCurveTo(controlX, controlY, toX, toY);
+    } else if (style === 'dotted') {
+        ctx.setLineDash([2, 8]);
+        ctx.quadraticCurveTo(controlX, controlY, toX, toY);
+    } else if (style === 'double') {
+        ctx.setLineDash([]);
+        ctx.quadraticCurveTo(controlX, controlY, toX, toY);
+        ctx.stroke();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = color1;
+        ctx.stroke();
+    }
+    ctx.stroke();
+}
+
+function redrawLines(theme = currentTheme) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    connections.forEach((conn, index) => {
+        const fromNode = document.querySelector(`.node[data-id="${conn.from}"]`);
+        const toNode = document.querySelector(`.node[data-id="${conn.to}"]`);
+        if (fromNode && toNode) {
+            const fromPos = getCenter(fromNode);
+            const toPos = getCenter(toNode);
+            drawLine(fromPos.x, fromPos.y, toPos.x, toPos.y, conn.style, conn.fillStyle, conn.color1, conn.color2);
+            conn.bounds = { x1: fromPos.x, y1: fromPos.y, x2: toPos.x, y2: toPos.y, index };
+        }
+    });
+    if (isDrawing && startNode && tempLine) {
+        const startPos = getCenter(startNode);
+        ctx.beginPath();
+        ctx.moveTo(startPos.x, startPos.y);
+        ctx.lineTo(tempLine.x, tempLine.y);
+        ctx.strokeStyle = theme === 'dark' ? '#aaaaaa' : '#555555';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+}
+
+function applyTheme(theme) {
+    currentTheme = theme;
+    const root = getComputedStyle(document.documentElement);
+    document.body.style.background = theme === 'dark' ? root.getPropertyValue('--background-dark').trim() : root.getPropertyValue('--background-light').trim();
+    document.body.style.color = theme === 'dark' ? root.getPropertyValue('--text-dark').trim() : root.getPropertyValue('--text-light').trim();
+    document.querySelectorAll('.node').forEach(node => {
+        const nodeId = parseInt(node.dataset.id);
+        const nodeData = nodes.find(n => n.id === nodeId);
+        if (nodeData) {
+            node.style.background = theme === 'dark' ? 'rgba(40, 40, 40, 0.9)' : 'rgba(255, 255, 255, 0.9)';
+            node.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+            node.style.border = `2px solid ${nodeData.color}`;
+        } else {
+            console.error('Node not found in nodes array during applyTheme:', nodeId, nodes);
+        }
+    });
+    const dock = document.getElementById('dock');
+    dock.style.background = theme === 'dark' ? root.getPropertyValue('--dock-bg-dark').trim() : root.getPropertyValue('--dock-bg-light').trim();
+    document.querySelectorAll('.dock-button').forEach(btn => {
+        btn.style.color = theme === 'dark' ? root.getPropertyValue('--text-dark').trim() : root.getPropertyValue('--text-light').trim();
+    });
+    document.querySelectorAll('.modal-content').forEach(modal => {
+        modal.classList.remove('modal-dark', 'modal-light');
+        modal.classList.add(theme === 'dark' ? 'modal-dark' : 'modal-light');
+    });
+    redrawLines(theme);
+}
+
+function makeDraggable(el) {
+    el.addEventListener('mousedown', e => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        const offsetX = e.clientX - el.offsetLeft;
+        const offsetY = e.clientY - el.offsetTop;
+        function moveHandler(ev) {
+            el.style.left = `${ev.clientX - offsetX}px`;
+            el.style.top = `${ev.clientY - offsetY}px`;
+            redrawLines();
+        }
+        function upHandler() {
+            document.removeEventListener('mousemove', moveHandler);
+            document.removeEventListener('mouseup', upHandler);
+            const nodeData = nodes.find(n => n.id === el.dataset.id);
+            if (nodeData) {
+                nodeData.left = parseInt(el.style.left);
+                nodeData.top = parseInt(el.style.top);
+            }
+        }
+        document.addEventListener('mousemove', moveHandler);
+        document.addEventListener('mouseup', upHandler);
+    });
+}
+
+function addButtons(node) {
+    node.querySelectorAll('.plus-button, .delete-button, .edit-button').forEach(btn => btn.remove());
+    const plus = document.createElement('div');
+    plus.className = 'plus-button';
+    plus.textContent = '+';
+    plus.addEventListener('mousedown', e => {
+        e.stopPropagation();
+        isDrawing = true;
+        startNode = node;
+        document.addEventListener('mousemove', drawTempLine);
+        document.addEventListener('mouseup', connectLine);
+    });
+    const del = document.createElement('div');
+    del.className = 'delete-button';
+    del.textContent = '×';
+    del.addEventListener('click', e => {
+        e.stopPropagation();
+        nodes = nodes.filter(n => n.id !== node.dataset.id);
+        connections = connections.filter(c => c.from !== node.dataset.id && c.to !== node.dataset.id);
+        node.remove();
+        redrawLines();
+    });
+    const edit = document.createElement('div');
+    edit.className = 'edit-button';
+    edit.textContent = '✎';
+    edit.addEventListener('click', e => {
+        e.stopPropagation();
+        console.log('Edit button clicked for node:', node.dataset.id);
+        showEditNodeModal(node);
+    });
+    node.appendChild(plus);
+    node.appendChild(del);
+    node.appendChild(edit);
+}
+
+function drawTempLine(e) {
+    if (isDrawing) {
+        tempLine = { x: e.clientX, y: e.clientY };
+        redrawLines();
+    }
+}
+
+function connectLine(e) {
+    if (isDrawing) {
+        isDrawing = false;
+        document.removeEventListener('mousemove', drawTempLine);
+        document.removeEventListener('mouseup', connectLine);
+        const endNode = e.target.closest('.node');
+        if (endNode && endNode !== startNode) {
+            connections.push({
+                from: startNode.dataset.id,
+                to: endNode.dataset.id,
+                style: 'solid',
+                fillStyle: 'solid-color',
+                color1: '#aaaaaa',
+                color2: '#ffffff'
+            });
+            redrawLines();
+            showEditLineModal(connections.length - 1);
+        }
+        tempLine = null;
+        redrawLines();
+    }
+}
+
+function showEditNodeModal(node) {
+    const editNodeModal = document.getElementById('edit-node-modal');
+    const nodeId = parseInt(node.dataset.id);
+    const nodeData = nodes.find(n => n.id === nodeId);
+    const editTextInput = document.getElementById('edit-node-text');
+    const editColorInput = document.getElementById('edit-node-color');
+    const submitButton = document.getElementById('submit-edit-node');
+    const closeButton = document.getElementById('close-edit-node');
+
+    console.log('Opening edit modal for node:', nodeData);
+    if (!nodeData) {
+        console.error('Node not found in nodes array:', nodeId, nodes);
+        return;
+    }
+
+    editTextInput.value = nodeData.text;
+    editColorInput.value = nodeData.color;
+    editNodeModal.style.display = 'flex';
+    editNodeModal.classList.add('show');
+
+    function applyChanges() {
+        const newText = editTextInput.value;
+        const newColor = editColorInput.value;
+        if (newText) {
+            node.querySelector('.node-text').textContent = newText;
+            node.style.border = `2px solid ${newColor}`;
+            nodeData.text = newText;
+            nodeData.color = newColor;
+            addButtons(node);
+            editNodeModal.classList.remove('show');
+            setTimeout(() => { editNodeModal.style.display = 'none'; }, 300);
+            console.log('Changes applied:', newText, newColor);
+        }
+        submitButton.removeEventListener('click', applyChanges);
+    }
+
+    function closeModal() {
+        editNodeModal.classList.remove('show');
+        setTimeout(() => { editNodeModal.style.display = 'none'; }, 300);
+        closeButton.removeEventListener('click', closeModal);
+    }
+
+    submitButton.removeEventListener('click', applyChanges);
+    closeButton.removeEventListener('click', closeModal);
+    submitButton.addEventListener('click', applyChanges);
+    closeButton.addEventListener('click', closeModal);
+}
+
+function showEditLineModal(index) {
+    const conn = connections[index];
+    document.getElementById('line-style').value = conn.style;
+    document.getElementById('fill-style').value = conn.fillStyle;
+    document.getElementById('line-color1').value = conn.color1;
+    document.getElementById('line-color2').value = conn.color2;
+    const connectModal = document.getElementById('connect-modal');
+    connectModal.style.display = 'flex';
+    setTimeout(() => connectModal.classList.add('show'), 10);
+    document.getElementById('submit-connect').onclick = () => {
+        conn.style = document.getElementById('line-style').value;
+        conn.fillStyle = document.getElementById('fill-style').value;
+        conn.color1 = document.getElementById('line-color1').value;
+        conn.color2 = document.getElementById('line-color2').value;
+        redrawLines();
+        connectModal.classList.remove('show');
+        setTimeout(() => connectModal.style.display = 'none', 300);
+    };
+    document.getElementById('close-connect').onclick = () => {
+        connectModal.classList.remove('show');
+        setTimeout(() => connectModal.style.display = 'none', 300);
+        lineHover.style.display = 'none';
+    };
+}
+
+canvas.addEventListener('mousemove', e => {
+    const x = e.clientX;
+    const y = e.clientY;
+    let lineHovered = null;
+    connections.forEach(conn => {
+        if (!conn.bounds) return;
+        const { x1, y1, x2, y2, index } = conn.bounds;
+        const dist = Math.abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1) / Math.sqrt((y2 - y1) ** 2 + (x2 - x1) ** 2);
+        if (dist < 5 && x >= Math.min(x1, x2) && x <= Math.max(x1, x2) && y >= Math.min(y1, y2) && y <= Math.max(y1, y2)) {
+            lineHovered = { index, x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
+        }
+    });
+    if (lineHovered) {
+        lineHover.style.left = `${lineHovered.x - 10}px`;
+        lineHover.style.top = `${lineHovered.y - 10}px`;
+        lineHover.style.display = 'block';
+        lineHover.dataset.index = lineHovered.index;
+    } else {
+        lineHover.style.display = 'none';
+    }
+});
+
+canvas.addEventListener('click', e => {
+    if (e.button !== 0) return;
+    const x = e.clientX;
+    const y = e.clientY;
+    let lineClicked = null;
+    connections.forEach(conn => {
+        if (!conn.bounds) return;
+        const { x1, y1, x2, y2, index } = conn.bounds;
+        const dist = Math.abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1) / Math.sqrt((y2 - y1) ** 2 + (x2 - x1) ** 2);
+        if (dist < 5 && x >= Math.min(x1, x2) && x <= Math.max(x1, x2) && y >= Math.min(y1, y2) && y <= Math.max(y1, y2)) {
+            lineClicked = index;
+        }
+    });
+    if (lineClicked !== null) {
+        showEditLineModal(lineClicked);
+    } else if (!e.target.closest('.node')) {
+        document.querySelectorAll('.plus-button, .delete-button, .edit-button').forEach(btn => btn.style.display = 'none');
+        selectedNodeId = null;
+    }
+});
+
+lineHover.addEventListener('click', () => {
+    const index = parseInt(lineHover.dataset.index);
+    showEditLineModal(index);
+});
+
+const nodeModal = document.getElementById('node-modal');
+document.getElementById('add-node').addEventListener('click', () => {
+    nodeModal.style.display = 'flex';
+    setTimeout(() => nodeModal.classList.add('show'), 10);
+});
+document.getElementById('close-node').addEventListener('click', () => {
+    nodeModal.classList.remove('show');
+    setTimeout(() => nodeModal.style.display = 'none', 300);
+});
+document.getElementById('submit-node').addEventListener('click', () => {
+    const text = document.getElementById('node-text').value;
+    const level = document.getElementById('node-level').value;
+    const color = document.getElementById('node-color').value;
+    if (text) {
+        const id = Date.now();
+        const node = document.createElement('div');
+        node.className = 'node';
+        node.dataset.id = id;
+        const textSpan = document.createElement('span');
+        textSpan.className = 'node-text';
+        textSpan.textContent = text;
+        node.appendChild(textSpan);
+        node.style.left = `${window.innerWidth / 2}px`;
+        node.style.top = `${window.innerHeight / 2}px`;
+        node.style.border = `2px solid ${color}`;
+        node.style.background = currentTheme === 'dark' ? 'rgba(40, 40, 40, 0.9)' : 'rgba(255, 255, 255, 0.9)';
+        node.style.color = currentTheme === 'dark' ? '#ffffff' : '#333333';
+        document.getElementById('map-container').appendChild(node);
+        nodes.push({ id, text, level, color, left: window.innerWidth / 2, top: window.innerHeight / 2 });
+        makeDraggable(node);
+        node.addEventListener('click', e => {
+            if (!e.target.classList.contains('plus-button') && !e.target.classList.contains('delete-button') && !e.target.classList.contains('edit-button')) {
+                document.querySelectorAll('.plus-button, .delete-button, .edit-button').forEach(btn => btn.style.display = 'none');
+                node.querySelector('.plus-button').style.display = 'flex';
+                node.querySelector('.delete-button').style.display = 'flex';
+                node.querySelector('.edit-button').style.display = 'flex';
+                selectedNodeId = id;
+            }
+        });
+        addButtons(node);
+        setTimeout(() => node.classList.add('appear'), 10);
+    }
+    nodeModal.classList.remove('show');
+    setTimeout(() => nodeModal.style.display = 'none', 300);
+});
+
+document.getElementById('save-map').addEventListener('click', () => {
+    nodes.forEach(node => {
+        const domNode = document.querySelector(`.node[data-id="${node.id}"]`);
+        if (domNode) {
+            node.left = parseInt(domNode.style.left) || node.left;
+            node.top = parseInt(domNode.style.top) || node.top;
+            node.text = domNode.querySelector('.node-text').textContent;
+            node.color = getComputedStyle(domNode).borderColor;
+        }
+    });
+    const mapData = { nodes, connections, currentTheme, betaThemeEnabled };
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(mapData));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "mindmap.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+});
+
+document.getElementById('load-map').addEventListener('click', () => document.getElementById('load-file').click());
+document.getElementById('load-file').addEventListener('change', event => {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const mapData = JSON.parse(e.target.result);
+            nodes = mapData.nodes || [];
+            connections = mapData.connections || [];
+            currentTheme = mapData.currentTheme || 'dark';
+            betaThemeEnabled = mapData.betaThemeEnabled || false;
+            document.querySelectorAll('.node').forEach(n => n.remove());
+            nodes.forEach(n => {
+                const node = document.createElement('div');
+                node.className = 'node';
+                node.dataset.id = n.id;
+                const textSpan = document.createElement('span');
+                textSpan.className = 'node-text';
+                textSpan.textContent = n.text;
+                node.appendChild(textSpan);
+                node.style.left = `${n.left}px`;
+                node.style.top = `${n.top}px`;
+                node.style.border = `2px solid ${n.color}`;
+                node.style.background = currentTheme === 'dark' ? 'rgba(40, 40, 40, 0.9)' : 'rgba(255, 255, 255, 0.9)';
+                node.style.color = currentTheme === 'dark' ? '#ffffff' : '#333333';
+                document.getElementById('map-container').appendChild(node);
+                makeDraggable(node);
+                node.addEventListener('click', e => {
+                    if (!e.target.classList.contains('plus-button') && !e.target.classList.contains('delete-button') && !e.target.classList.contains('edit-button')) {
+                        document.querySelectorAll('.plus-button, .delete-button, .edit-button').forEach(btn => btn.style.display = 'none');
+                        node.querySelector('.plus-button').style.display = 'flex';
+                        node.querySelector('.delete-button').style.display = 'flex';
+                        node.querySelector('.edit-button').style.display = 'flex';
+                        selectedNodeId = n.id;
+                    }
+                });
+                addButtons(node);
+                setTimeout(() => node.classList.add('appear'), 10);
+            });
+            applyTheme(currentTheme);
+            redrawLines();
+            document.getElementById('beta-theme-toggle').checked = betaThemeEnabled;
+        };
+        reader.readAsText(file);
+    }
+});
+
+const settingsModal = document.getElementById('settings-modal');
+document.getElementById('settings').addEventListener('click', () => {
+    settingsModal.style.display = 'flex';
+    setTimeout(() => settingsModal.classList.add('show'), 10);
+    document.getElementById('beta-theme-toggle').checked = betaThemeEnabled;
+});
+document.getElementById('close-settings').addEventListener('click', () => {
+    settingsModal.classList.remove('show');
+    setTimeout(() => settingsModal.style.display = 'none', 300);
+});
+document.getElementById('apply-settings').addEventListener('click', () => {
+    betaThemeEnabled = document.getElementById('beta-theme-toggle').checked;
+    currentTheme = betaThemeEnabled ? 'light' : 'dark';
+    applyTheme(currentTheme);
+    settingsModal.classList.remove('show');
+    setTimeout(() => settingsModal.style.display = 'none', 300);
+});
+
+document.getElementById('map-container').addEventListener('mousedown', e => {
+    if (e.button !== 0 || e.target.closest('.node') || e.target.closest('#dock')) return;
+    isSelecting = true;
+    selectionStart = { x: e.clientX, y: e.clientY };
+    selectionBox.style.left = `${e.clientX}px`;
+    selectionBox.style.top = `${e.clientY}px`;
+    selectionBox.style.width = '0px';
+    selectionBox.style.height = '0px';
+    selectionBox.style.display = 'block';
+});
+
+document.addEventListener('mousemove', e => {
+    if (isSelecting) {
+        const currentX = e.clientX;
+        const currentY = e.clientY;
+        const width = currentX - selectionStart.x;
+        const height = currentY - selectionStart.y;
+        selectionBox.style.left = `${width < 0 ? currentX : selectionStart.x}px`;
+        selectionBox.style.top = `${height < 0 ? currentY : selectionStart.y}px`;
+        selectionBox.style.width = `${Math.abs(width)}px`;
+        selectionBox.style.height = `${Math.abs(height)}px`;
+    }
+});
+
+document.addEventListener('mouseup', () => {
+    if (isSelecting) {
+        isSelecting = false;
+        selectionBox.style.display = 'none';
+    }
+});
+
+document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'c' || e.key === 'x')) {
+        const target = e.target;
+        if (target.closest('.node')) e.preventDefault();
+    }
+});
+
+const screenshotModal = document.getElementById('screenshot-modal');
+document.getElementById('screenshot').addEventListener('click', () => {
+    screenshotModal.style.display = 'flex';
+    setTimeout(() => screenshotModal.classList.add('show'), 10);
+});
+document.getElementById('close-screenshot').addEventListener('click', () => {
+    screenshotModal.classList.remove('show');
+    setTimeout(() => screenshotModal.style.display = 'none', 300);
+});
+document.getElementById('screenshot-theme').addEventListener('change', e => {
+    document.getElementById('both-options').style.display = e.target.value === 'both' ? 'block' : 'none';
+});
+
+document.getElementById('submit-screenshot').addEventListener('click', () => {
+    const theme = document.getElementById('screenshot-theme').value;
+    const format = theme === 'both' ? document.getElementById('screenshot-format').value : null;
+    const mapContainer = document.getElementById('map-container');
+    const dock = document.getElementById('dock');
+    const lineHover = document.getElementById('line-hover');
+    const buttons = document.querySelectorAll('.plus-button, .delete-button, .edit-button');
+    const selectionBox = document.getElementById('selection-box');
+    dock.style.display = 'none';
+    lineHover.style.display = 'none';
+    buttons.forEach(btn => btn.style.display = 'none');
+    selectionBox.style.display = 'none';
+    const root = getComputedStyle(document.documentElement);
+    const backgroundDark = root.getPropertyValue('--background-dark').trim();
+    const backgroundLight = root.getPropertyValue('--background-light').trim();
+    const textDark = root.getPropertyValue('--text-dark').trim();
+    const textLight = root.getPropertyValue('--text-light').trim();
+    const originalBackground = document.body.style.background;
+    const originalColor = document.body.style.color;
+    const originalNodeStyles = Array.from(document.querySelectorAll('.node')).map(node => {
+        const nodeId = parseInt(node.dataset.id);
+        const nodeData = nodes.find(n => n.id === nodeId);
+        return {
+            node,
+            background: node.style.background,
+            color: node.style.color,
+            borderColor: nodeData ? nodeData.color : '#ffffff',
+            backdropFilter: node.style.backdropFilter
+        };
+    });
+    function takeScreenshot(theme) {
+        document.body.style.background = theme === 'dark' ? backgroundDark : backgroundLight;
+        document.body.style.color = theme === 'dark' ? textDark : textLight;
+        document.querySelectorAll('.node').forEach((node, i) => {
+            node.style.background = theme === 'dark' ? 'rgba(40, 40, 40, 0.9)' : 'rgba(255, 255, 255, 0.9)';
+            node.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+            node.style.border = `2px solid ${nodes[i].color}`;
+            node.style.backdropFilter = 'blur(10px)';
+        });
+        redrawLines(theme);
+        return html2canvas(mapContainer, {
+            backgroundColor: theme === 'dark' ? backgroundDark : backgroundLight,
+            useCORS: true,
+            allowTaint: true,
+            scale: 2
+        }).then(canvas => canvas.toDataURL('image/png'));
+    }
+    if (theme === 'dark' || theme === 'light') {
+        takeScreenshot(theme).then(dataUrl => {
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = `mindmap_${theme}.png`;
+            link.click();
+        });
+    } else if (theme === 'both') {
+        Promise.all([takeScreenshot('dark'), takeScreenshot('light')]).then(([darkUrl, lightUrl]) => {
+            if (format === 'vertical') {
+                const combinedCanvas = document.createElement('canvas');
+                const ctx = combinedCanvas.getContext('2d');
+                const imgDark = new Image();
+                const imgLight = new Image();
+                imgDark.src = darkUrl;
+                imgLight.src = lightUrl;
+                imgDark.onload = () => {
+                    imgLight.onload = () => {
+                        combinedCanvas.width = Math.max(imgDark.width, imgLight.width);
+                        combinedCanvas.height = imgDark.height + imgLight.height;
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
+                        ctx.drawImage(imgDark, 0, 0);
+                        ctx.drawImage(imgLight, 0, imgDark.height);
+                        const link = document.createElement('a');
+                        link.href = combinedCanvas.toDataURL('image/png');
+                        link.download = 'mindmap_both_vertical.png';
+                        link.click();
+                    };
+                };
+            } else if (format === 'horizontal') {
+                const combinedCanvas = document.createElement('canvas');
+                const ctx = combinedCanvas.getContext('2d');
+                const imgLight = new Image();
+                const imgDark = new Image();
+                imgLight.src = lightUrl;
+                imgDark.src = darkUrl;
+                imgLight.onload = () => {
+                    imgDark.onload = () => {
+                        combinedCanvas.width = imgLight.width + imgDark.width;
+                        combinedCanvas.height = Math.max(imgLight.height, imgDark.height);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
+                        ctx.drawImage(imgLight, 0, 0);
+                        ctx.drawImage(imgDark, imgLight.width, 0);
+                        const link = document.createElement('a');
+                        link.href = combinedCanvas.toDataURL('image/png');
+                        link.download = 'mindmap_both_horizontal.png';
+                        link.click();
+                    };
+                };
+            } else if (format === 'separate') {
+                const linkDark = document.createElement('a');
+                linkDark.href = darkUrl;
+                linkDark.download = 'mindmap_dark.png';
+                linkDark.click();
+                const linkLight = document.createElement('a');
+                linkLight.href = lightUrl;
+                linkLight.download = 'mindmap_light.png';
+                linkLight.click();
+            }
+        });
+    }
+    setTimeout(() => {
+        document.body.style.background = originalBackground;
+        document.body.style.color = originalColor;
+        originalNodeStyles.forEach(({ node, background, color, borderColor, backdropFilter }) => {
+            node.style.background = background;
+            node.style.color = color;
+            node.style.border = `2px solid ${borderColor}`;
+            node.style.backdropFilter = backdropFilter;
+        });
+        redrawLines();
+        dock.style.display = 'flex';
+        if (selectedNodeId) {
+            const selectedNode = document.querySelector(`.node[data-id="${selectedNodeId}"]`);
+            if (selectedNode) {
+                selectedNode.querySelector('.plus-button').style.display = 'flex';
+                selectedNode.querySelector('.delete-button').style.display = 'flex';
+                selectedNode.querySelector('.edit-button').style.display = 'flex';
+            }
+        }
+        screenshotModal.classList.remove('show');
+        setTimeout(() => screenshotModal.style.display = 'none', 300);
+    }, 100);
+});
+
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    redrawLines();
+});
+
+applyTheme(currentTheme);
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</body>
+</html>
