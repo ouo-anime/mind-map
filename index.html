@@ -286,6 +286,8 @@ input:checked + .slider:before {
     <button type="button" class="dock-button" id="save-map" title="Save Map">💾</button>
     <button type="button" class="dock-button" id="load-map" title="Load Map">📂</button>
     <button type="button" class="dock-button" id="screenshot" title="Screenshot">📷</button>
+    <button type="button" class="dock-button" id="undo" title="Undo">↶</button>
+    <button type="button" class="dock-button" id="redo" title="Redo">↷</button>
     <button type="button" class="dock-button" id="settings" title="Settings">⚙️</button>
 </div>
 <input type="file" id="load-file" accept=".json" style="display:none;">
@@ -386,6 +388,97 @@ const lineHover = document.getElementById('line-hover');
 const selectionBox = document.getElementById('selection-box');
 let isSelecting = false;
 let selectionStart = null;
+let undoStack = [];
+let redoStack = [];
+const MAX_HISTORY = 50;
+
+function saveState() {
+    nodes.forEach(node => {
+        const domNode = document.querySelector(`.node[data-id="${node.id}"]`);
+        if (domNode) {
+            node.left = parseInt(domNode.style.left) || node.left;
+            node.top = parseInt(domNode.style.top) || node.top;
+        }
+    });
+    const newState = {
+        nodes: JSON.parse(JSON.stringify(nodes)),
+        connections: JSON.parse(JSON.stringify(connections))
+    };
+    const lastState = undoStack[undoStack.length - 1];
+    if (!lastState || JSON.stringify(lastState) !== JSON.stringify(newState)) {
+        undoStack.push(newState);
+        if (undoStack.length > MAX_HISTORY) undoStack.shift();
+        redoStack = [];
+        console.log('State saved (unique):', newState);
+    } else {
+        console.log('State not saved (duplicate):', newState);
+    }
+}
+
+function updateUI() {
+    document.querySelectorAll('.node').forEach(n => n.remove());
+    nodes.forEach(n => {
+        const node = document.createElement('div');
+        node.className = 'node appear';
+        node.dataset.id = n.id;
+        const textSpan = document.createElement('span');
+        textSpan.className = 'node-text';
+        textSpan.textContent = n.text;
+        node.appendChild(textSpan);
+        node.style.left = `${n.left}px`;
+        node.style.top = `${n.top}px`;
+        node.style.border = `2px solid ${n.color}`;
+        node.style.background = currentTheme === 'dark' ? 'rgba(40, 40, 40, 0.9)' : 'rgba(255, 255, 255, 0.9)';
+        node.style.color = currentTheme === 'dark' ? '#ffffff' : '#333333';
+        document.getElementById('map-container').appendChild(node);
+        makeDraggable(node);
+        node.addEventListener('click', e => {
+            if (!e.target.classList.contains('plus-button') && !e.target.classList.contains('delete-button') && !e.target.classList.contains('edit-button')) {
+                document.querySelectorAll('.plus-button, .delete-button, .edit-button').forEach(btn => btn.style.display = 'none');
+                node.querySelector('.plus-button').style.display = 'flex';
+                node.querySelector('.delete-button').style.display = 'flex';
+                node.querySelector('.edit-button').style.display = 'flex';
+                selectedNodeId = n.id;
+            }
+        });
+        addButtons(node);
+    });
+    redrawLines();
+}
+
+function undo() {
+    if (undoStack.length > 0) {
+        const currentState = {
+            nodes: JSON.parse(JSON.stringify(nodes)),
+            connections: JSON.parse(JSON.stringify(connections))
+        };
+        redoStack.push(currentState);
+        const previousState = undoStack.pop();
+        nodes = previousState.nodes;
+        connections = previousState.connections;
+        updateUI();
+        console.log('Undo performed. Current nodes:', nodes, 'Undo stack:', undoStack.length);
+    } else {
+        console.log('Nothing to undo');
+    }
+}
+
+function redo() {
+    if (redoStack.length > 0) {
+        const currentState = {
+            nodes: JSON.parse(JSON.stringify(nodes)),
+            connections: JSON.parse(JSON.stringify(connections))
+        };
+        undoStack.push(currentState);
+        const nextState = redoStack.pop();
+        nodes = nextState.nodes;
+        connections = nextState.connections;
+        updateUI();
+        console.log('Redo performed. Current nodes:', nodes, 'Redo stack:', redoStack.length);
+    } else {
+        console.log('Nothing to redo');
+    }
+}
 
 function getCenter(el) {
     const rect = el.getBoundingClientRect();
@@ -507,18 +600,21 @@ function makeDraggable(el) {
         e.preventDefault();
         const offsetX = e.clientX - el.offsetLeft;
         const offsetY = e.clientY - el.offsetTop;
+        let moved = false;
         function moveHandler(ev) {
             el.style.left = `${ev.clientX - offsetX}px`;
             el.style.top = `${ev.clientY - offsetY}px`;
             redrawLines();
+            moved = true;
         }
         function upHandler() {
             document.removeEventListener('mousemove', moveHandler);
             document.removeEventListener('mouseup', upHandler);
-            const nodeData = nodes.find(n => n.id === el.dataset.id);
-            if (nodeData) {
+            const nodeData = nodes.find(n => n.id === parseInt(el.dataset.id));
+            if (nodeData && moved) {
                 nodeData.left = parseInt(el.style.left);
                 nodeData.top = parseInt(el.style.top);
+                saveState();
             }
         }
         document.addEventListener('mousemove', moveHandler);
@@ -543,6 +639,7 @@ function addButtons(node) {
     del.textContent = '×';
     del.addEventListener('click', e => {
         e.stopPropagation();
+        saveState();
         nodes = nodes.filter(n => n.id !== node.dataset.id);
         connections = connections.filter(c => c.from !== node.dataset.id && c.to !== node.dataset.id);
         node.remove();
@@ -575,6 +672,7 @@ function connectLine(e) {
         document.removeEventListener('mouseup', connectLine);
         const endNode = e.target.closest('.node');
         if (endNode && endNode !== startNode) {
+            saveState();
             connections.push({
                 from: startNode.dataset.id,
                 to: endNode.dataset.id,
@@ -615,6 +713,7 @@ function showEditNodeModal(node) {
         const newText = editTextInput.value;
         const newColor = editColorInput.value;
         if (newText) {
+            saveState();
             node.querySelector('.node-text').textContent = newText;
             node.style.border = `2px solid ${newColor}`;
             nodeData.text = newText;
@@ -649,6 +748,7 @@ function showEditLineModal(index) {
     connectModal.style.display = 'flex';
     setTimeout(() => connectModal.classList.add('show'), 10);
     document.getElementById('submit-connect').onclick = () => {
+        saveState();
         conn.style = document.getElementById('line-style').value;
         conn.fillStyle = document.getElementById('fill-style').value;
         conn.color1 = document.getElementById('line-color1').value;
@@ -726,6 +826,7 @@ document.getElementById('submit-node').addEventListener('click', () => {
     const level = document.getElementById('node-level').value;
     const color = document.getElementById('node-color').value;
     if (text) {
+        saveState();
         const id = Date.now();
         const node = document.createElement('div');
         node.className = 'node';
@@ -841,6 +942,18 @@ document.getElementById('apply-settings').addEventListener('click', () => {
     applyTheme(currentTheme);
     settingsModal.classList.remove('show');
     setTimeout(() => settingsModal.style.display = 'none', 300);
+});
+
+document.getElementById('undo').addEventListener('click', (e) => {
+    e.preventDefault();
+    console.log('Undo clicked. Undo stack length:', undoStack.length);
+    undo();
+});
+
+document.getElementById('redo').addEventListener('click', (e) => {
+    e.preventDefault();
+    console.log('Redo clicked. Redo stack length:', redoStack.length);
+    redo();
 });
 
 document.getElementById('map-container').addEventListener('mousedown', e => {
